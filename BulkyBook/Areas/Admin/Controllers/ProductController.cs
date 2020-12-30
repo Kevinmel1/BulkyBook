@@ -1,7 +1,6 @@
 ﻿using BulkyBook.DataAccess.Repository.IRepository;
 using BulkyBook.Models;
-using BulkyBook.Utility;
-using Dapper;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
@@ -11,13 +10,15 @@ using System.Threading.Tasks;
 namespace BulkyBook.Areas.Admin.Controllers
 {
     [Area("Admin")]
-    public class CoverTypeController : Controller
+    public class ProductController : Controller
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IWebHostEnvironment _hostEnvironment;
 
-        public CoverTypeController(IUnitOfWork unitOfWork)
+        public ProductController(IUnitOfWork unitOfWork, IWebHostEnvironment hostEnvironment)
         {
             _unitOfWork = unitOfWork;
+            _hostEnvironment = hostEnvironment;
         }
         public IActionResult Index()
         {
@@ -26,45 +27,40 @@ namespace BulkyBook.Areas.Admin.Controllers
 
         public IActionResult Upsert(int? id)
         {
-            CoverType coverType = new CoverType();
+            Product product = new Product();
             if (id == null)
             {
-                //create 
-                return View(coverType);
+                //create
+                return View(product);
             }
 
             //Edit
-            var parameter = new DynamicParameters();
-            parameter.Add("@Id", id);
-            coverType = _unitOfWork.SP_Call.OneRecord<CoverType>(SD.Proc_CoverType_Get, parameter);
-            if (coverType == null)
+            product = _unitOfWork.Product.Get(id.GetValueOrDefault());
+            if (product == null)
             {
                 return NotFound();
             }
-            return View(coverType);
+            return View(product);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Upsert(CoverType coverType)
+        public IActionResult Upsert(Product product)
         {
             if (ModelState.IsValid)
             {
-                var parameter = new DynamicParameters();
-                parameter.Add("@Name", coverType.Name);
-                if (coverType.Id == 0)
+                if (product.Id == 0)
                 {
-                    _unitOfWork.SP_Call.Execute(SD.Proc_CoverType_Create, parameter);
+                    _unitOfWork.Product.Add(product);
                 }
                 else
                 {
-                    parameter.Add("@Id", coverType.Id);
-                    _unitOfWork.SP_Call.Execute(SD.Proc_CoverType_Update, parameter);
+                    _unitOfWork.Product.Update(product);
                 }
                 _unitOfWork.Save();
                 return RedirectToAction(nameof(Index));
             }
-            return View(coverType);
+            return View(product);
         }
 
 
@@ -73,21 +69,19 @@ namespace BulkyBook.Areas.Admin.Controllers
         [HttpGet]
         public IActionResult GetAll()
         {
-            var allObj = _unitOfWork.SP_Call.List<CoverType>(SD.Proc_CoverType_GetAll, null);
+            var allObj = _unitOfWork.Product.GetAll();
             return Json(new { data = allObj });
         }
 
         [HttpDelete]
         public IActionResult Delete(int id)
         {
-            var parameter = new DynamicParameters();
-            parameter.Add("@Id", id);
-            var objFromDb = _unitOfWork.SP_Call.OneRecord<CoverType>(SD.Proc_CoverType_Get, parameter);
-            if(objFromDb == null)
+            var objFromDb = _unitOfWork.Product.Get(id);
+            if (objFromDb == null)
             {
                 return Json(new { success = false, message = "Error while deleting" });
             }
-            _unitOfWork.SP_Call.Execute(SD.Proc_CoverType_Delete, parameter);
+            _unitOfWork.Product.Remove(objFromDb);
             _unitOfWork.Save();
             return Json(new { success = true, message = "Delete Successful!" });
         }
